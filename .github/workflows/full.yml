@@ -40,24 +40,6 @@ jobs:
       GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
 
     steps:
-    - name: Maximize build space
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 1024
-#        swap-size-mb: 1024
-#        swap-size-mb: 8192
-        temp-reserve-mb: 1024
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-
-    - name: Check build space
-      run: |
-        echo "Free space after removing swap:"
-        sudo df -h
-        echo "Current path:"
-        pwd
-
     - name: Checkout
       uses: actions/checkout@v3
 
@@ -83,6 +65,24 @@ jobs:
         rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev libfuse-dev
         echo "Free space after initializing environment:"
         sudo df -h
+
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 1024
+#        swap-size-mb: 1024
+#        swap-size-mb: 8192
+        temp-reserve-mb: 1024
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+
+    - name: Check build space
+      run: |
+        echo "Free space after removing swap:"
+        sudo df -h
+        echo "Current path:"
+        pwd
 
     - name: Clone Source Code
       run: |
