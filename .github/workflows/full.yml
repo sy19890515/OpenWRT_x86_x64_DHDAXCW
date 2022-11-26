@@ -30,7 +30,11 @@ env:
 
 jobs:
   Build:
+    timeout-minutes: 1440
+#    runs-on: self-hosted
+#    runs-on: ubuntu-latest
     runs-on: ubuntu-22.04
+    if: github.repository == 'sy19890515/OpenWRT_x86_x64_DHDAXCW'
     outputs:
       OPENWRTROOT: ${{ steps.update.outputs.OPENWRTROOT }}
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
@@ -54,12 +58,13 @@ jobs:
         ulimit -a
         sudo apt update -y
         sudo apt full-upgrade -y
-        sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-        bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
-        git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
-        libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz aria2 lib32gcc-s1 \
-        mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip libpython3-dev qemu-utils \
-        rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev libfuse-dev
+        sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential pkgconf \
+        bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib lrzsz \
+        git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev upx-ucl \
+        libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool aria2 lib32gcc-s1 \
+        mkisofs msmtp nano ninja-build p7zip p7zip-full patch python2.7 python3 python3-pip libpython3-dev qemu-utils \
+        rsync scons squashfs-tools subversion swig texinfo uglifyjs unzip vim wget xmlto xxd zlib1g-dev libfuse-dev \
+        libxslt-dev libedit-dev libsqlite3-dev libsodium-dev libgps-dev libev-dev
         echo "Free space after initializing environment:"
         sudo df -h
 
@@ -88,6 +93,9 @@ jobs:
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
+        cd openwrt
+        echo "Free space after cloning source code:"
+        sudo df -h
 
     - name: Update Feeds
       id: update
@@ -96,15 +104,19 @@ jobs:
         echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
         echo "OPENWRTROOT=$PWD" >> $GITHUB_OUTPUT
         mkdir customfeeds
-        git clone --depth=1 https://github.com/coolsnowwolf/packages customfeeds/packages
+        git clone --depth=1 https://github.com/sy19890515/packages-DHDAXCW customfeeds/packages
         git clone --depth=1 https://github.com/coolsnowwolf/luci customfeeds/luci
         chmod +x ../scripts/*.sh
         ../scripts/hook-feeds.sh
-        
+        echo "Free space after updating feeds:"
+        sudo df -h
+
     - name: Install Feeds
       run: |
         cd $OPENWRTROOT
         ./scripts/feeds install -a
+        echo "Free space after installing feeds:"
+        sudo df -h
 
     - name: Load Custom Configuration
       run: |
@@ -117,26 +129,31 @@ jobs:
         ../scripts/preset-terminal-tools.sh
         sed -i '$a\CONFIG_DEVEL=y\nCONFIG_LOCALMIRROR=\"https://openwrt.cc/dl/coolsnowwolf/lede\"' .config
         make defconfig
-        
+        echo "Free space after loading custon configuration:"
+        sudo df -h
+
     - name: Download Package
       id: package
       run: |
         cd $OPENWRTROOT
         cat .config
-        make download -j50
+        make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-  
+        echo "Free space after downloading package:"
+        sudo df -h
+
     - name: Compile Packages
+#      timeout-minutes: 540
       id: compile
       run: |
         cd $OPENWRTROOT
         echo -e "$(nproc) thread compile"
-        make tools/compile -j$(nproc) || make tools/compile -j40
-        make toolchain/compile -j$(nproc) || make toolchain/compile -j40
-        make target/compile -j$(nproc) || make target/compile -j40 IGNORE_ERRORS=1
+        make tools/compile -j$(nproc) IGNORE_ERRORS=1
+        make toolchain/compile -j$(nproc) IGNORE_ERRORS=1
+        make target/compile -j$(nproc) IGNORE_ERRORS=1
         make diffconfig
-        make package/compile -j$(nproc) IGNORE_ERRORS=1 || make package/compile -j40 IGNORE_ERRORS=1
+        make package/compile -j$(nproc) IGNORE_ERRORS=1
         make package/index
         cd $OPENWRTROOT/bin/packages/*
         PLATFORM=$(basename `pwd`)
@@ -153,6 +170,8 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "FIRMWARE=$PWD" >> $GITHUB_OUTPUT
         echo "COMPILE_STATUS=success" >> $GITHUB_OUTPUT
+        echo "Free space after compiling packages:"
+        sudo df -h
 
     - name: Generate Firmware
       if: steps.compile.outputs.COMPILE_STATUS == 'success'
@@ -192,6 +211,8 @@ jobs:
         make checksum
         mv bin/targets/x86/64/sha256sums bin/targets/x86/64/full-sha256sums
         echo "GENERATE_STATUS=success" >> $GITHUB_OUTPUT
+        echo "Free space after generating firmware:"
+        sudo df -h
 
     - name: Generate release tag
       id: tag
@@ -200,13 +221,13 @@ jobs:
           echo "release_tag=$(date +"%Y.%m.%d")-Lean3" >> $GITHUB_OUTPUT
           echo "release_date=$(date +"%Y.%m.%d")" >> $GITHUB_OUTPUT
           touch release.txt
-          echo "后台地址：192.168.11.1
+          echo "后台地址：192.168.3.1
                 full   = 全插件
                 docker = 带docker
                 slim   = 精简版
                 beggar = 乞丐版" >> release.txt
           echo "status=success" >> $GITHUB_OUTPUT
-          
+
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
