@@ -17,8 +17,8 @@ on:
   #   types: started
 
 env:
-  REPO_URL: https://github.com/coolsnowwolf/lede
-  REPO_BRANCH: master
+  REPO_URL: https://github.com/DHDAXCW/lede-rockchip
+  REPO_BRANCH: stable
   CONFIG_FILE: configs/lean/lean_docker.config
   DIY_SH: scripts/lean.sh
   KMODS_IN_FIRMWARE: true
@@ -52,7 +52,7 @@ jobs:
         echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
         echo "OPENWRTROOT=$PWD" >> $GITHUB_OUTPUT
         mkdir customfeeds
-        git clone --depth=1 https://github.com/coolsnowwolf/packages customfeeds/packages
+        git clone --depth=1 https://github.com/DHDAXCW/packages customfeeds/packages
         git clone --depth=1 https://github.com/DHDAXCW/luci customfeeds/luci
         chmod +x ../scripts/*.sh
         ../scripts/hook-feeds.sh
@@ -71,7 +71,6 @@ jobs:
         ../$DIY_SH
         ../scripts/preset-clash-core.sh amd64
         ../scripts/preset-terminal-tools.sh
-        sed -i '$a\CONFIG_DEVEL=y\nCONFIG_LOCALMIRROR=\"https://openwrt.cc/dl/coolsnowwolf/lede\"' .config
         make defconfig
         
     - name: Download Package
@@ -88,11 +87,11 @@ jobs:
       run: |
         cd $OPENWRTROOT
         echo -e "$(nproc) thread compile"
-        make tools/compile -j$(nproc) || make tools/compile -j40
-        make toolchain/compile -j$(nproc) || make toolchain/compile -j40
-        make target/compile -j$(nproc) || make target/compile -j40 IGNORE_ERRORS=1
+        make tools/compile -j$(nproc) || make tools/compile -j$(nproc)
+        make toolchain/compile -j$(nproc) || make toolchain/compile -j$(nproc)
+        make target/compile -j$(nproc) || make target/compile -j$(nproc) IGNORE_ERRORS=1
         make diffconfig
-        make package/compile -j$(nproc) IGNORE_ERRORS=1 || make package/compile -j40 IGNORE_ERRORS=1
+        make package/compile -j$(nproc) IGNORE_ERRORS=1 || make package/compile -j$(nproc) IGNORE_ERRORS=1
         make package/index
         cd $OPENWRTROOT/bin/packages/*
         PLATFORM=$(basename `pwd`)
@@ -175,13 +174,13 @@ jobs:
           files: ${{ env.FIRMWARE }}/*
 
     - name: Delete workflow runs
-      uses: GitRML/delete-workflow-runs@main
+      uses: Mattraks/delete-workflow-runs@v2
       with:
           retain_days: 1
           keep_minimum_runs: 1
 
     - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@v0.1.0
+      uses: dev-drprasad/delete-older-releases@v0.2.1
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
           keep_latest: 20
@@ -190,7 +189,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Delete Artifacts
-      uses: geekyeggo/delete-artifact@v1
+      uses: geekyeggo/delete-artifact@v2
       with:
-          name: |
+         name: |
             bin-archive
